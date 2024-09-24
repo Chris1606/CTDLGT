@@ -149,10 +149,12 @@ def player_attack(mouse_pos, grid, game_logic, file_name):
         if game_logic[row][col] == 'S':
             print(f"Hit at {row}, {col}")
             game_logic[row][col] = 'H'  
+            gunshot.play()
             #fill_tile(GAME_SCREEN, row, col, RED, grid, CELLSIZE)
         else:
             print(f"Miss at {row}, {col}")
             game_logic[row][col] = 'M'
+            splash.play()
             #fill_tile(GAME_SCREEN, row, col, BLUE, grid, CELLSIZE)
 
     with open(file_name, 'w') as file:
@@ -160,6 +162,19 @@ def player_attack(mouse_pos, grid, game_logic, file_name):
             row_symbols = [cell if cell in ['S', 'H', 'M'] else '*' for cell in logic_row]
             file.write("".join(row_symbols) + "\n")  
 
+def player_win(file_name):
+    with open(file_name, 'r') as file:
+        file_grid = [list(line.strip()) for line in file.readlines()]
+
+    for row in file_grid:
+        if 'S' in row:  # If there is still a ship, player has not won yet
+            return False
+            
+    return True  # All ships have been hit, player wins!
+
+
+            
+    
 
 
 
@@ -212,15 +227,26 @@ def computer_attack(game_logic, file_name, attack_position):
         if game_logic[row][col] == 'S':
             print(f"Hit at {row}, {col}")
             game_logic[row][col] = 'H'
+            gunshot.play()
+
         else:
             print(f"Miss at {row}, {col}")
             game_logic[row][col] = 'M' 
+            splash.play()
+
     with open(file_name, 'w') as file:
         for logic_row in game_logic:
             row_symbols = [cell if cell in ['S', 'H', 'M'] else '*' for cell in logic_row]
             file.write("".join(row_symbols) + "\n")  
         
-    
+def computer_win(file_name):
+    with open(file_name, 'r') as file: 
+        file_grid = [list(line.strip()) for line in file.readlines()]
+
+    for row in file_grid:
+        if 'S' in row: 
+            return False
+    return True
 #game logic
 def print_game_logic():
     print('Player Grid'.center(50, '#'))
@@ -269,6 +295,13 @@ def fill_tile(screen, row, col, color, grid, CELLSIZE):
     rect = pygame.Rect(x, y, CELLSIZE, CELLSIZE)  # Create the rectangle object
     pygame.draw.rect(screen, color, rect)  # Draw the filled rectangle
     pygame.display.update()  # Update the screen to reflect changes
+
+def dispaly_winner_message(message):
+    text = FONT.render(message, True, RED)
+    text_rect = text.get_rect(center = (SCREEN_HEIGHT/ 2, SCREEN_WIDTH / 2))
+    GAME_SCREEN.blit(text, text_rect)
+    pygame.display.flip()
+
 
 def update_game_screen(window):
     # Instead of filling the entire window, we can selectively redraw elements
@@ -335,6 +368,13 @@ destroyer = Ship(destroyer_img, 3, 350, 500)
 patrol_boat = Ship(patrol_boat_img, 2, 450, 500)
 ships = [battleship, carrier, cruiser, destroyer, patrol_boat]
 
+
+# Load sounds
+
+explosion = pygame.mixer.Sound('assets/sounds/explosion.wav')
+gunshot = pygame.mixer.Sound('assets/sounds/gunshot.wav')
+splash = pygame.mixer.Sound('assets/sounds/splash.wav')
+
 print_game_logic()
 
 computer_ships = [Ship(battleship_img, 5, 0, 0),
@@ -351,7 +391,9 @@ place_and_save_computer_ships(computer_ships, cGameGrid, cGameLogic)
 
 #Store attacked position of computer
 attack_position = set()
-COMPUTER_DELAY = 200  # 1 second delay
+
+
+COMPUTER_DELAY = 500  # 2 seconds delay
 computer_attack_time = None 
 player_turn = True
 while RUN_GAME:
@@ -383,6 +425,10 @@ while RUN_GAME:
                 player_attack(mouse_pos, cGameGrid, cGameLogic, 'computer.txt')  # Player attacks
                 save_grid_to_file("computer.txt", cGameLogic)  # Save the updated computer grid
                 
+                if player_win('computer.txt') == True: 
+                    print("Player Win")
+                    dispaly_winner_message("PLAYER WIN")
+                    pygame.time.delay(5000)
                 player_turn = False  # End player's turn, switch to computer's turn
                 computer_attack_time = pygame.time.get_ticks()
 
@@ -393,6 +439,11 @@ while RUN_GAME:
         if current_time - computer_attack_time >= COMPUTER_DELAY:  # Check if delay has passed
             computer_attack(pGameLogic, 'player.txt', attack_position)  # Computer attacks
             save_grid_to_file("player.txt", pGameLogic)  # Save the updated player grid
+
+            if player_win('player.txt') == True: 
+                print("Computer Win")
+                           
+
             player_turn = True  # Switch back to player's turn
             computer_attack_time = None  # Reset the timer
 
