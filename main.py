@@ -7,6 +7,13 @@ pygame.init()
 
 pygame.font.init()
 FONT = pygame.font.SysFont('Arial', 24)
+
+FPS = 50
+clock = pygame.time.Clock()
+
+
+BLUE =  (0, 0, 255)
+RED =   (255, 0, 0)
 # Save Game
 def save_grid_to_file(file_name, grid):
     """Saves the grid to a file, representing empty cells as '*' and ships as 'S'."""
@@ -63,11 +70,12 @@ def get_clicked_tile(mouse_pos, grid, cellsize):
                 
     return None, None 
 
+   
+#not yet implementing 
 def display_message(window, message, position):
     """Displays a message on the game window."""
     text_surface = FONT.render(message, True, (255, 0, 0))  # Red color
     window.blit(text_surface, position)
-
 
 #player fucntion
 def clear_previous_position(ship, game_logic):
@@ -116,7 +124,6 @@ def snap_ship_to_grid(ship, grid, cellsize, game_logic):
                     game_logic[row + i][col] = 'S'
             else:
                 display_message(GAME_SCREEN, "Overlap detected or out of bounds (horizontal).", (600, 600))
-
                 print("Overlap detected or out of bounds (vertical).")
         else:
             if col + ship.length <= len(grid[0]) and not is_overlapping(ship, row, col, game_logic):
@@ -129,6 +136,32 @@ def snap_ship_to_grid(ship, grid, cellsize, game_logic):
                     game_logic[row][col + i] = 'S'
             else:
                 print("Overlap detected or out of bounds (horizontal).")
+
+def player_attack(mouse_pos, grid, game_logic, file_name):
+    """Handles the attack by checking the clicked tile, updating the game logic, and saving the result."""
+    row, col = get_clicked_tile(mouse_pos, grid, CELLSIZE)
+
+    if row is not None and col is not None:
+        if game_logic[row][col] in ['H', 'M']:
+            #print(f"The tile {row}, {col} is shoot before")
+            return False
+            
+        if game_logic[row][col] == 'S':
+            print(f"Hit at {row}, {col}")
+            game_logic[row][col] = 'H'  
+            #fill_tile(GAME_SCREEN, row, col, RED, grid, CELLSIZE)
+        else:
+            print(f"Miss at {row}, {col}")
+            game_logic[row][col] = 'M'
+            #fill_tile(GAME_SCREEN, row, col, BLUE, grid, CELLSIZE)
+
+    with open(file_name, 'w') as file:
+        for logic_row in game_logic:
+            row_symbols = [cell if cell in ['S', 'H', 'M'] else '*' for cell in logic_row]
+            file.write("".join(row_symbols) + "\n")  
+
+
+
 
 #computer function 
 def randomly_place_ship(ship, grid, game_logic):
@@ -163,6 +196,31 @@ def place_and_save_computer_ships(ships, grid, game_logic):
     for ship in ships:
         randomly_place_ship(ship, grid, game_logic)
     save_ships_to_file('computer.txt', ships)
+
+def computer_attack(game_logic, file_name, attack_position):
+    
+    while True: 
+        row = random.randint(0, len(game_logic) - 1)
+        col = random.randint(0, len(game_logic) - 1)
+         
+        if (row, col) not in attack_position: 
+            attack_position.add((row, col))
+            break
+
+    if row is not None and col is not None:
+        
+        if game_logic[row][col] == 'S':
+            print(f"Hit at {row}, {col}")
+            game_logic[row][col] = 'H'
+        else:
+            print(f"Miss at {row}, {col}")
+            game_logic[row][col] = 'M' 
+    with open(file_name, 'w') as file:
+        for logic_row in game_logic:
+            row_symbols = [cell if cell in ['S', 'H', 'M'] else '*' for cell in logic_row]
+            file.write("".join(row_symbols) + "\n")  
+        
+    
 #game logic
 def print_game_logic():
     print('Player Grid'.center(50, '#'))
@@ -205,12 +263,40 @@ class Ship:
         return ship_rect.collidepoint(mouse_pos)
 
 # Update the screen
+def fill_tile(screen, row, col, color, grid, CELLSIZE):
+    """Fills a specific tile on the grid with a given color."""
+    x, y = grid[row][col]  # Get the top-left corner coordinates of the tile from the grid
+    rect = pygame.Rect(x, y, CELLSIZE, CELLSIZE)  # Create the rectangle object
+    pygame.draw.rect(screen, color, rect)  # Draw the filled rectangle
+    pygame.display.update()  # Update the screen to reflect changes
+
 def update_game_screen(window):
-    window.fill((0, 0, 0))
-    show_grid_on_screen(window, CELLSIZE, pGameGrid, cGameGrid)
+    # Instead of filling the entire window, we can selectively redraw elements
+    window.fill((0,0,0))
+    # Draw the grids (assuming they stay consistent)
+    show_grid_on_screen(window, CELLSIZE, pGameGrid, cGameGrid)  # Draw the grids first
+    
+    # Draw the ships on the player grid
     for ship in ships:
         ship.draw()
-    pygame.display.update()
+
+    # Only draw the tiles where hits or misses occurred
+    for row in range(ROWS):
+        for col in range(COLS):
+            if pGameLogic[row][col] == 'H':  # Hit
+                fill_tile(window, row, col, RED, pGameGrid, CELLSIZE)
+            elif pGameLogic[row][col] == 'M':  # Miss
+                fill_tile(window, row, col, BLUE, pGameGrid, CELLSIZE)
+            
+            if cGameLogic[row][col] == 'H':  # Hit on computer side
+                fill_tile(window, row, col, RED, cGameGrid, CELLSIZE)
+            elif cGameLogic[row][col] == 'M':  # Miss on computer side
+                fill_tile(window, row, col, BLUE, cGameGrid, CELLSIZE)
+
+    # Finally, update only the changed areas or the whole display if needed
+    pygame.display.update()  # You can pass specific rects if you want partial updates
+
+
 
 # Game Initialization
 SCREEN_WIDTH = 1000
@@ -218,7 +304,7 @@ SCREEN_HEIGHT = 800
 ROWS = 10
 COLS = 10
 CELLSIZE = 40
-GAME_SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+GAME_SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.DOUBLEBUF)
 pygame.display.set_caption("Battle Ship")
 
 # Initialize grids
@@ -251,17 +337,27 @@ ships = [battleship, carrier, cruiser, destroyer, patrol_boat]
 
 print_game_logic()
 
+computer_ships = [Ship(battleship_img, 5, 0, 0),
+                  Ship(carrier_img, 4, 0, 0),
+                  Ship(cruiser_img, 3, 0, 0),
+                  Ship(destroyer_img, 3, 0, 0),
+                  Ship(patrol_boat_img, 2, 0, 0)]
 # Run game loop
 # Run game loop
 RUN_GAME = True
 selected_ship = None
 
-while RUN_GAME:
-    for event in pygame.event.get():
-        # Save the logical grids (pGameLogic and cGameLogic)
-        save_grid_to_file("player.txt", pGameLogic)
-        save_grid_to_file("computer.txt", cGameLogic)
+place_and_save_computer_ships(computer_ships, cGameGrid, cGameLogic)
 
+#Store attacked position of computer
+attack_position = set()
+COMPUTER_DELAY = 200  # 1 second delay
+computer_attack_time = None 
+player_turn = True
+while RUN_GAME:
+    # Event loop
+    for event in pygame.event.get():
+        
         if event.type == pygame.QUIT:
             RUN_GAME = False
 
@@ -272,26 +368,45 @@ while RUN_GAME:
                     selected_ship = ship
                     ship.is_dragging = True
                     break
-            if event.button == 3:  # Right click to toggle orientation
-                if selected_ship:
-                    selected_ship.toggle_orientation()
+            if event.button == 3 and selected_ship:  # Right-click to toggle orientation
+                selected_ship.toggle_orientation()
 
         elif event.type == pygame.MOUSEBUTTONUP:
             if selected_ship:
                 selected_ship.is_dragging = False
-                # Snap ship to grid and update game logic
                 snap_ship_to_grid(selected_ship, pGameGrid, CELLSIZE, pGameLogic)
-                save_ships_to_file('player.txt', ships)
+                save_ships_to_file('player.txt', ships)  # Save ships after placement
+                save_grid_to_file("player.txt", pGameLogic)  # Save grid after update
                 selected_ship = None
+            elif player_turn:
+                mouse_pos = pygame.mouse.get_pos()
+                player_attack(mouse_pos, cGameGrid, cGameLogic, 'computer.txt')  # Player attacks
+                save_grid_to_file("computer.txt", cGameLogic)  # Save the updated computer grid
+                
+                player_turn = False  # End player's turn, switch to computer's turn
+                computer_attack_time = pygame.time.get_ticks()
 
+
+    # Computer's turn logic
+    if not player_turn and computer_attack_time:
+        current_time = pygame.time.get_ticks()
+        if current_time - computer_attack_time >= COMPUTER_DELAY:  # Check if delay has passed
+            computer_attack(pGameLogic, 'player.txt', attack_position)  # Computer attacks
+            save_grid_to_file("player.txt", pGameLogic)  # Save the updated player grid
+            player_turn = True  # Switch back to player's turn
+            computer_attack_time = None  # Reset the timer
+
+    # Dragging the ship with the mouse
     if selected_ship and selected_ship.is_dragging:
-        # Update ship's position to follow the mouse
         mouse_pos = pygame.mouse.get_pos()
         selected_ship.x = mouse_pos[0] - CELLSIZE // 2
         selected_ship.y = mouse_pos[1] - CELLSIZE // 2
 
-    # Update the game screen
+    # Redraw the game screen
     update_game_screen(GAME_SCREEN)
+    
+    # Limit frame rate
+    clock.tick(FPS)
 
 pygame.quit()
 
